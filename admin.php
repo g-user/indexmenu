@@ -362,7 +362,7 @@ class admin_plugin_indexmenu extends DokuWiki_Admin_Plugin {
      * @author Samuele Tognini <samuele@samuele.netsons.org>
      */
     function _remotequery($url, $tag = true) {
-        require_once (DOKU_INC.'inc/HTTPClient.php');
+        require_once (DOKU_INC.'inc/HTTP/HTTPClient.php');
         $http          = new DokuHTTPClient();
         $http->timeout = 8;
         $data          = $http->get($url);
