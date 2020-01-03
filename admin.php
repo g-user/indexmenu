@@ -330,7 +330,7 @@ class admin_plugin_indexmenu extends DokuWiki_Admin_Plugin {
      * @author Samuele Tognini <samuele@samuele.netsons.org>
      */
     function _checkupdates() {
-        require_once (DOKU_INC.'inc/HTTPClient.php');
+        require_once (DOKU_INC.'inc/HTTP/HTTPClient.php');
         global $conf;
         global $INFO;
         $w    = -1;
