@@ -51,7 +51,7 @@ class action_plugin_indexmenu extends DokuWiki_Action_Plugin {
     function _extendJSINFO(&$event, $param) {
         global $INFO, $JSINFO;
         $JSINFO['isadmin'] = (int) $INFO['isadmin'];
-        $JSINFO['isauth']  = (int) $INFO['userinfo'];
+        $JSINFO['isauth']  = isset($INFO['userinfo']) ? (int) $INFO['userinfo'] : 0;
     }
 
     /**
@@ -83,7 +83,7 @@ class action_plugin_indexmenu extends DokuWiki_Action_Plugin {
             } else if($aclcache == 'groups') {
                 //Cache per groups
                 global $INFO;
-                if($INFO['userinfo']['grps']) $newkey = implode('#', $INFO['userinfo']['grps']);
+                if(isset($INFO['userinfo']['grps'])) $newkey = implode('#', $INFO['userinfo']['grps']);
             }
             if($newkey) {
                 $cache->key .= "#".$newkey;
@@ -157,9 +157,7 @@ class action_plugin_indexmenu extends DokuWiki_Action_Plugin {
 
                 $data = $this->_getlocalThemes();
 
-               // require_once DOKU_INC.'inc/JSON.php';
-                $json = new JSON();
-                echo ''.$json->encode($data).'';
+                echo ''.json_encode($data).'';
                 break;
 
             case 'toc':
@@ -219,7 +217,7 @@ class action_plugin_indexmenu extends DokuWiki_Action_Plugin {
         if(auth_quickaclcheck($id) < AUTH_READ) return '';
 
         $meta = p_get_metadata($id);
-        $toc  = $meta['description']['tableofcontents'];
+        $toc  = $meta['description']['tableofcontents'] ?? [];
 
         if(count($toc) > 1) {
             //display ToC of two or more headings
