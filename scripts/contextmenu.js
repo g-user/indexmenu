@@ -66,6 +66,11 @@
  *   indexmenu_contextmenu['all']['pg']['view'].splice(1, 0, ['Input new page', '"javascript: IndexmenuContextmenu.reqpage(\'"+index.config.urlbase+"\',\'"+index.config.sepchar+"\',\'"+node.dokuid+"\');"']);
  */
 
+/* global LANG */
+/* global DOKU_BASE */
+/* global JSINFO */
+
+
 // IMPORTANT: DON'T MODIFY THIS FILE, BUT EDIT contextmenu.local.js PLEASE!
 // THIS FILE IS OVERWRITTEN WHEN PLUGIN IS UPDATED
 
@@ -76,12 +81,12 @@ indexmenu_contextmenu['all']['pg'] = {
     'view': [
         ['<span class="indexmenu_titlemenu"><b>'+LANG.plugins.indexmenu.page+'</b></span>'],
         [LANG.plugins.indexmenu.revs, 'IndexmenuContextmenu.getid(index.config.urlbase,id)+"do=revisions"'],
-        [LANG.plugins.indexmenu.tocpreview, '"javascript: IndexmenuContextmenu.createTocMenu(\'call=indexmenu&req=toc&id="+id+"\',\'picker_"+index.obj+"\',\'s"+index.obj+node.id+"\');"']
+        [LANG.plugins.indexmenu.tocpreview, '"javascript: IndexmenuContextmenu.createTocMenu(\'call=indexmenu&req=toc&id="+id+"\',\'picker_"+index.treeName+"\',\'s"+index.treeName+node.id+"\');"']
     ],
     //Menu items in edit mode, when previewing
     'edit': [
         ['<span class="indexmenu_titlemenu"><b>'+LANG.plugins.indexmenu.editmode+'</b></span>'],
-        [LANG.plugins.indexmenu.insertdwlink, '"javascript: IndexmenuContextmenu.insertTags(\'"+id+"\',\'"+index.config.sepchar+"\');"+index.obj+".divdisplay(\'r\',0);"', LANG.plugins.indexmenu.insertdwlinktooltip]
+        [LANG.plugins.indexmenu.insertdwlink, '"javascript: IndexmenuContextmenu.insertTags(\'"+id+"\',\'"+index.config.sepchar+"\');"+index.treeName+".divdisplay(\'r\',0);"', LANG.plugins.indexmenu.insertdwlinktooltip]
     ]
 };
 
@@ -149,44 +154,76 @@ var IndexmenuContextmenu = {
      * Insert your custom functions (available for all users) here.
      */
 
-    srchpage: function (u, s, isdir, nid) {
-        var r = prompt(LANG.plugins.indexmenu.insertkeywords, "");
-        if (r) {
-            var fnid = nid;
+    /**
+     * Navigate to the search page
+     *
+     * @param {string} urlbase index.config.urlbase
+     * @param {string} sepchar index.config.sepchar
+     * @param {boolean} isdir whether a directory (probably boolean, might be string)
+     * @param {string} nid  page id of node (dokuid mentioned in indexmenu.js)
+     */
+
+    srchpage: function (urlbase, sepchar, isdir, nid) {
+        const enteredText = prompt(LANG.plugins.indexmenu.insertkeywords, "");
+        if (enteredText) {
+            let fnid = nid;
             if (isdir == "0") {
-                fnid = fnid.substring(0, nid.lastIndexOf(s));
+                fnid = fnid.substring(0, nid.lastIndexOf(sepchar));
             }
-            var b = u, re = new RegExp(s, 'g');
+            let b = urlbase, re = new RegExp(sepchar, 'g');
             fnid = fnid.replace(re, ":");
-            b += (u.indexOf("?id=") < 0) ? '?id=' : '';
-            window.location.href = IndexmenuContextmenu.getid(b, r + " @" + fnid) + "do=search";
+            b += (urlbase.indexOf("?id=") < 0) ? '?id=' : '';
+            window.location.href = IndexmenuContextmenu.getid(b, enteredText + " @" + fnid) + "do=search";
         }
     },
 
-    getid: function (u, id) {
-        var url = (u || '') + encodeURI(id || '');
-        url += (u.indexOf("?") < 0) ? '?' : '&';
+    /**
+     * Build a url to a wiki page
+     *
+     * @param {string} urlbase
+     * @param {string} id
+     * @returns {string}
+     */
+    getid: function (urlbase, id) {
+        let url = (urlbase || '') + encodeURIComponent(id || '');
+        url += (urlbase.indexOf("?") < 0) ? '?' : '&';
         return url;
     },
 
-    reqpage: function (b, s, id, n) {
-        var r;
-        if (n) {
-            r = id + s + n;
+    /**
+     * Navigate to the editor window
+     *
+     * @param {string} urlbase
+     * @param {string} sepchar
+     * @param {string} id
+     * @param {string} pagename
+     */
+    reqpage: function (urlbase, sepchar, id, pagename) {
+        let newpageid;
+        if (pagename) {
+            newpageid = id + sepchar + pagename;
         } else {
-            r = prompt(LANG.plugins.indexmenu.insertpagename, "");
-            if (!r) {
+            newpageid = prompt(LANG.plugins.indexmenu.insertpagename, "");
+            if (!newpageid) {
                 return;
             }
-            r = id + s + r;
+            newpageid = id + sepchar + newpageid;
         }
-        if (r) window.location.href = IndexmenuContextmenu.getid(b, r) + "do=edit";
+        if (newpageid) {
+            window.location.href = IndexmenuContextmenu.getid(urlbase, newpageid) + "do=edit";
+        }
     },
 
-    insertTags: function (lnk, sep) {
-        var r, l = lnk;
-        if (sep) {
-            r = new RegExp(sep, "g");
+    /**
+     * Insert link syntax with given id in current editor window
+     *
+     * @param {string} lnk page id
+     * @param {string} sepchar
+     */
+    insertTags: function (lnk, sepchar) {
+        let r, l = lnk;
+        if (sepchar) {
+            r = new RegExp(sepchar, "g");
             l = lnk.replace(r, ':');
         }
         insertTags('wiki__text', '[[', ']]', l);
@@ -284,11 +321,12 @@ var IndexmenuContextmenu = {
     },
 
     /**
-     * Concatenates contextmenu configuration arrays
+     * Fills the contextmenu by creating entries from the given configuration arrays and concatenating these
+     * to the #r<id> picker
      *
-     * @param amenu
-     * @param index
-     * @param n
+     * @param {any[]} amenu (part of) the configuration array
+     * @param {dTree} index the indexmenu object
+     * @param {int} n node id
      */
     arrconcat: function (amenu, index, n) {
         var html, id, item, a, li;
@@ -311,7 +349,7 @@ var IndexmenuContextmenu = {
                 return true;
             }
             item = document.createElement('li');
-            var $cmenu = jQuery('#r' + index.obj);
+            var $cmenu = jQuery('#r' + index.treeName);
             if (cmenuentry[1]) {
                 if (cmenuentry[1] instanceof Array) {
                     html = document.createElement('ul');
@@ -336,9 +374,9 @@ var IndexmenuContextmenu = {
     },
 
     /**
+     * Absolute positioning of the div at place of mouseclick
      *
-     *
-     * @param obj
+     * @param obj div element
      * @param e
      */
     mouseposition: function (obj, e) {
@@ -358,24 +396,25 @@ var IndexmenuContextmenu = {
     },
 
     /**
+     * Check mouse button onmousedown event, only for middle and right mouse button contextmenu is shown
      *
-     *
-     * @param n
-     * @param obj
-     * @param e
+     * @param {int} n node id
+     * @param {string|dTree} obj the unique name of a dTree object
+     * @param {event} e
      */
     checkcontextm: function (n, obj, e) {
         e = e || event;
-        if ((e.which == 3 || e.button == 2) || (window.opera && e.which == 1 && e.ctrlKey)) {
+        // mouse clicks: which 3 === right, button 2 === right button
+        if ((e.which === 3 || e.button === 2) || (window.opera && e.which === 1 && e.ctrlKey)) {
             obj.contextmenu(n, e);
             IndexmenuContextmenu.stopevt(e);
         }
     },
 
     /**
+     * Prevent default oncontextmenu event
      *
-     *
-     * @param e
+     * @param {event} e
      * @returns {boolean}
      */
     stopevt: function (e) {
